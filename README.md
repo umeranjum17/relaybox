@@ -30,13 +30,13 @@ shrinking, release native libraries and bundled Hermes JavaScript (**no Metro**)
 ABI splits are enabled without a universal APK. The owner transfer limit is
 **30,000,000 bytes**, not 30 MiB; check the file size before handing it off.
 
-Current handoff artifact, built with that command from application commit
-`04769e0c55c944ca1cc5ae479230c84ddbab481f` (both templates present):
+Current large-text handoff artifact, built with that command (both templates present;
+source HEAD and device captures are recorded in the accompanying PR evidence):
 `android/app/build/outputs/apk/sideload/app-arm64-v8a-sideload.apk`,
-**15,931,408 bytes**, SHA-256:
+**15,931,108 bytes**, SHA-256:
 
 ```text
-6c0b244229532a7c422ce9fc8e5d8957dc66d35abbac688e446e1a404ae34ebb
+9870702f0a6beea17213a29d75754f277d90fbf1faa4f30709fc6c38705fedf1
 ```
 
 For an x86_64 emulator, use the same recipe with an architecture override:
@@ -102,10 +102,11 @@ Each email includes `X-Relaybox-Id`, a generated MIME `Message-ID`, `Date`, and 
 Deleting local data from either template deletes both templates' settings, queue and shared credential.
 There is no mailbox reader or agent execution adapter; email acceptance is not agent acceptance.
 
-Debug and debuggable sideload APKs offer **Use DEBUG transcript substitute**. This clearly labelled substitute produces
-a known synthetic transcript when Finish speaking is tapped; editing, Send, storage, SMTP and history
-are real. The fixture implementation lives only in `android/app/src/debug` (also used by the debuggable sideload source set); the release factory rejects
-substitution and contains no fixture transcript. Release signing/distribution remains out of scope.
+The transcript substitute control is not included in the app UI. Captain-facing `assembleSideload`
+APKs compile the release speech factory, which rejects substitution and contains no fixture transcript.
+The synthetic implementation is compiled only by `assembleDebug`. Sideload retains the localhost TLS
+proof transport independently of recognition. Historical substituted evidence below is not a real
+speech-accuracy claim. Release signing/distribution remains out of scope.
 
 ## Small architecture
 
