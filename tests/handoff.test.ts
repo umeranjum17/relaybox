@@ -24,7 +24,10 @@ test('delete disclosure wraps its title and keeps both actions outside the scrol
   assert.match(modal, /onPress=\{\(\) => setDeleteFrom\(null\)\}/);
   assert(modal.includes('Delete rule and all local data?'));
   assert(modal.includes('Delete all local data?'));
-  assert.match(app, /dialogBody: \{flexGrow: 0, flexShrink: 1, minHeight: 0\}/);
+  assert.match(modal, /onLayout=\{event => setDialogHeight\(event.nativeEvent.layout.height\)\}/);
+  assert(modal.includes('height: Math.max(0, dialogHeight - 32)'));
+  assert(!modal.includes("maxHeight: '100%'"));
+  assert.match(app, /dialogBody: \{flex: 1, minHeight: 0\}/);
   assert.match(app, /dialogFooter: \{flexShrink: 0\}/);
   assert.equal((app.match(/await service\.remove\(\)/g) || []).length, 1);
 });

@@ -33,10 +33,10 @@ ABI splits are enabled without a universal APK. The owner transfer limit is
 Current large-text handoff artifact, built with that command (both templates present;
 source HEAD and device captures are recorded in the accompanying PR evidence):
 `android/app/build/outputs/apk/sideload/app-arm64-v8a-sideload.apk`,
-**15,932,188 bytes**, SHA-256:
+**15,932,344 bytes**, SHA-256:
 
 ```text
-fa90bf19a85a50bf069d2974b086beed3a61ab9c8b15ca121e97b67d7a51cae5
+c54e556edc1973af5d244754e0a53166f3e605730c5413530067bc4ae5616a6f
 ```
 
 For an x86_64 emulator, use the same recipe with an architecture override:

@@ -15,6 +15,7 @@ export default function App() {
   const [previous, setPrevious] = useState<'setup' | 'status' | 'voice'>('setup');
   const [voiceSetup, setVoiceSetup] = useState(false);
   const [deleteFrom, setDeleteFrom] = useState<'voice' | 'sms' | null>(null);
+  const [dialogHeight, setDialogHeight] = useState(0);
   const dark = useColorScheme() === 'dark';
   const [transcript, setTranscript] = useState('');
   const actionLock = useRef(false);
@@ -149,7 +150,7 @@ export default function App() {
         <View style={styles.card}><Text style={styles.label}>EMAIL CONNECTION</Text><Text style={styles.body}>{rule.agentDestination || 'Not configured yet'}</Text><Text style={styles.caption}>Subject: {rule.agentSubject || 'Not configured yet'}</Text><Text style={styles.caption}>Uses the same SMTP connection and saved app password as SMS. Destination and subject are captured when you tap Send; retries keep that envelope.</Text></View>
         {button('Configure agent email', () => {setVoiceSetup(true); setStep(2); setScreen('setup'); setNotice('');}, true)}
         {button('Choose template', chooseTemplates, true)}
-        {button('Delete rule & local data', () => {Keyboard.dismiss(); setDeleteFrom('voice');}, true)}
+        {button('Delete rule & local data', () => {Keyboard.dismiss(); setDialogHeight(0); setDeleteFrom('voice');}, true)}
         {history()}
       </> : service.available && screen === 'status' ? <>
         <Text style={styles.eyebrow}>FORWARD SMS TO EMAIL</Text><Text android_hyphenationFrequency="normal" style={styles.title}>{rule.enabled ? 'Your rule is on.' : 'Forwarding is paused.'}</Text>
@@ -158,7 +159,7 @@ export default function App() {
         {button(rule.enabled ? 'Pause forwarding' : 'Resume forwarding', () => act(async () => {await service.toggle(); setRule(await service.settings());}))}
         {button('Send synthetic test email', test, true)}
         <View style={styles.actions}>{button('Edit rule', () => act(async () => {if (rule.enabled) {await service.toggle();} setRule(await service.settings()); setScreen('setup'); setStep(1);}), true)}
-          {button('Delete rule & local data', () => {Keyboard.dismiss(); setDeleteFrom('sms');}, true)}</View>
+          {button('Delete rule & local data', () => {Keyboard.dismiss(); setDialogHeight(0); setDeleteFrom('sms');}, true)}</View>
         {button('Choose template', chooseTemplates, true)}
         {history()}
       </> : null}
@@ -167,8 +168,8 @@ export default function App() {
       <Text style={styles.footer}>LOCAL FIRST · ONLY YOUR CONNECTION</Text>
     </ScrollView>
     <Modal visible={deleteFrom !== null} transparent animationType="fade" onRequestClose={() => setDeleteFrom(null)}>
-      <View style={styles.dialogBackdrop}>
-        <View accessibilityViewIsModal style={[styles.card, styles.dialogSheet, dark && styles.dialogDark]}>
+      <View style={styles.dialogBackdrop} onLayout={event => setDialogHeight(event.nativeEvent.layout.height)}>
+        {dialogHeight > 0 ? <View accessibilityViewIsModal style={[styles.card, styles.dialogSheet, {height: Math.max(0, dialogHeight - 32)}, dark && styles.dialogDark]}>
           <Text accessibilityRole="header" style={[styles.section, styles.dialogTitle, dark && styles.dialogLightText]}>{deleteFrom === 'voice' ? 'Delete all local data?' : 'Delete rule and all local data?'}</Text>
           <ScrollView style={styles.dialogBody} contentContainerStyle={styles.dialogBodyContent} persistentScrollbar>
             <Text style={[styles.body, dark && styles.dialogLightText]}>{deleteFrom === 'voice' ? 'This also deletes SMS settings, queued messages and the saved app password. Sent email cannot be recalled.' : 'Queued messages, delivery history and the saved app password will be removed. Emails already sent cannot be recalled.'}</Text>
@@ -177,7 +178,7 @@ export default function App() {
             <Pressable accessibilityRole="button" onPress={() => setDeleteFrom(null)} style={[styles.button, styles.secondary, dark && styles.dialogSecondaryDark]}><Text style={[styles.buttonText, styles.secondaryText, dark && styles.dialogLightText]}>Cancel</Text></Pressable>
             <Pressable accessibilityRole="button" accessibilityState={{disabled: busy}} disabled={busy} onPress={deleteLocalData} style={[styles.button, styles.danger, busy && styles.disabled]}><Text style={styles.buttonText}>Delete</Text></Pressable>
           </View>
-        </View>
+        </View> : null}
       </View>
     </Modal>
   </KeyboardAvoidingView>;
@@ -201,7 +202,7 @@ export const styles = StyleSheet.create({
   caption: {color: '#526779', fontSize: 13, lineHeight: 20, marginBottom: 8}, sender: {alignItems: 'flex-start', gap: 4}, senderText: {fontSize: 17, color: '#102436', alignSelf: 'stretch'},
   actions: {marginTop: 8}, error: {color: '#923c24', fontSize: 14, lineHeight: 21}, busy: {margin: 16}, footer: {fontSize: 10, color: '#526779', textAlign: 'center', letterSpacing: 1.5, marginTop: 32},
   dialogBackdrop: {flex: 1, justifyContent: 'center', padding: 16, backgroundColor: 'rgba(16,36,54,0.6)'},
-  dialogSheet: {maxHeight: '100%', marginVertical: 0, padding: 16, backgroundColor: '#f5f7fa'},
-  dialogTitle: {flexShrink: 0}, dialogBody: {flexGrow: 0, flexShrink: 1, minHeight: 0}, dialogBodyContent: {paddingRight: 8}, dialogFooter: {flexShrink: 0},
+  dialogSheet: {marginVertical: 0, padding: 16, backgroundColor: '#f5f7fa'},
+  dialogTitle: {flexShrink: 0}, dialogBody: {flex: 1, minHeight: 0}, dialogBodyContent: {paddingRight: 8}, dialogFooter: {flexShrink: 0},
   dialogDark: {backgroundColor: '#102436', borderColor: '#526779'}, dialogLightText: {color: '#f5f7fa'}, dialogSecondaryDark: {backgroundColor: '#243d50'}, danger: {backgroundColor: '#923c24'},
 });
