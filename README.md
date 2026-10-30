@@ -30,6 +30,15 @@ shrinking, release native libraries and bundled Hermes JavaScript (**no Metro**)
 ABI splits are enabled without a universal APK. The owner transfer limit is
 **30,000,000 bytes**, not 30 MiB; check the file size before handing it off.
 
+Current handoff artifact, built with that command from application commit
+`04769e0c55c944ca1cc5ae479230c84ddbab481f` (both templates present):
+`android/app/build/outputs/apk/sideload/app-arm64-v8a-sideload.apk`,
+**15,931,408 bytes**, SHA-256:
+
+```text
+6c0b244229532a7c422ce9fc8e5d8957dc66d35abbac688e446e1a404ae34ebb
+```
+
 For an x86_64 emulator, use the same recipe with an architecture override:
 
 ```sh
