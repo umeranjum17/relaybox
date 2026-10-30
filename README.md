@@ -30,13 +30,13 @@ shrinking, release native libraries and bundled Hermes JavaScript (**no Metro**)
 ABI splits are enabled without a universal APK. The owner transfer limit is
 **30,000,000 bytes**, not 30 MiB; check the file size before handing it off.
 
-Current handoff artifact, built with that command from application commit
-`04769e0c55c944ca1cc5ae479230c84ddbab481f` (both templates present):
+Current large-text handoff artifact, built with that command (both templates present;
+source HEAD and device captures are recorded in the accompanying PR evidence):
 `android/app/build/outputs/apk/sideload/app-arm64-v8a-sideload.apk`,
-**15,931,408 bytes**, SHA-256:
+**15,932,344 bytes**, SHA-256:
 
 ```text
-6c0b244229532a7c422ce9fc8e5d8957dc66d35abbac688e446e1a404ae34ebb
+c54e556edc1973af5d244754e0a53166f3e605730c5413530067bc4ae5616a6f
 ```
 
 For an x86_64 emulator, use the same recipe with an architecture override:
@@ -76,6 +76,10 @@ The status screen offers pause/resume, edit, delete, synthetic test and retry of
 Editing pauses first; pending deliveries use the newly saved connection on resumption.
 Pause holds queued messages and ignores new SMS; an already-sending email can finish.
 “Sent” means the SMTP server accepted the email, **not** that an inbox received it.
+Delete opens an app-owned disclosure: its title wraps, its message scrolls independently,
+and Cancel/Delete remain outside the message viewport. Cancel or Back only dismisses it;
+local data is removed only after the explicit Delete action. The disclosure supports light
+and dark app appearance without capping the system text scale.
 
 ## Talk to your agent
 
@@ -102,10 +106,11 @@ Each email includes `X-Relaybox-Id`, a generated MIME `Message-ID`, `Date`, and 
 Deleting local data from either template deletes both templates' settings, queue and shared credential.
 There is no mailbox reader or agent execution adapter; email acceptance is not agent acceptance.
 
-Debug and debuggable sideload APKs offer **Use DEBUG transcript substitute**. This clearly labelled substitute produces
-a known synthetic transcript when Finish speaking is tapped; editing, Send, storage, SMTP and history
-are real. The fixture implementation lives only in `android/app/src/debug` (also used by the debuggable sideload source set); the release factory rejects
-substitution and contains no fixture transcript. Release signing/distribution remains out of scope.
+The transcript substitute control is not included in the app UI. Captain-facing `assembleSideload`
+APKs compile the release speech factory, which rejects substitution and contains no fixture transcript.
+The synthetic implementation is compiled only by `assembleDebug`. Sideload retains the localhost TLS
+proof transport independently of recognition. Historical substituted evidence below is not a real
+speech-accuracy claim. Release signing/distribution remains out of scope.
 
 ## Small architecture
 

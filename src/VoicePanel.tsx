@@ -11,7 +11,6 @@ export function VoicePanel({input, text, edit, send, busy, styles}: {
   const [phase, setPhase] = useState<'idle' | 'starting' | 'listening' | 'processing' | 'ready' | 'error'>('idle');
   const [engine, setEngine] = useState('');
   const [error, setError] = useState('');
-  const [debug, setDebug] = useState(false);
   const running = useRef(false);
   const mounted = useRef(true);
   useEffect(() => {mounted.current = true; return () => {mounted.current = false; input.cancel();};}, [input]);
@@ -19,7 +18,7 @@ export function VoicePanel({input, text, edit, send, busy, styles}: {
     if (running.current || busy) {return;}
     running.current = true; setPhase('starting'); setError(''); setEngine('');
     try {
-      const result = await recognize(input, (s: RecognitionPhase) => {if (mounted.current) {setPhase(s.phase); setEngine(s.engine);}}, debug);
+      const result = await recognize(input, (s: RecognitionPhase) => {if (mounted.current) {setPhase(s.phase); setEngine(s.engine);}});
       if (mounted.current) {edit(result); setPhase('ready');}
     } catch (e) {
       if (mounted.current) {setPhase('error'); setError(e instanceof Error ? e.message : 'Recognition stopped. Retry.');}
@@ -41,8 +40,6 @@ export function VoicePanel({input, text, edit, send, busy, styles}: {
     {active ? <>{button('Finish speaking', () => input.finish(), phase !== 'listening' || busy)}{button('Cancel recognition', () => input.cancel(), busy, true)}</> :
       button(phase === 'error' ? 'Retry recognition' : 'Push to talk', start, busy)}
     {phase === 'error' ? button('Open app permissions', () => {input.openSettings().catch(() => setError('Open Android Settings, then Relaybox permissions.'));}, busy, true) : null}
-    {input.debugAvailable ? button(debug ? 'DEBUG substitute on — use real recognizer' : 'Use DEBUG transcript substitute', () => setDebug(!debug), active || busy, true) : null}
-    {debug ? <Text style={styles.caption}>DEBUG ONLY: substitutes a known synthetic transcript. No microphone or real speech result. Tap Finish speaking to produce it.</Text> : null}
     <Text style={styles.label}>Editable transcript</Text>
     <TextInput accessibilityLabel="Editable transcript" multiline textAlignVertical="top" value={text}
       editable={!active && !busy} onChangeText={edit} placeholder="Your prompt — speak or type here" placeholderTextColor="#66758a"

@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {ActivityIndicator, Alert, AppState, KeyboardAvoidingView, PermissionsAndroid, Platform,
-  Pressable, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, View} from 'react-native';
+import {ActivityIndicator, AppState, Keyboard, KeyboardAvoidingView, Modal, PermissionsAndroid, Platform,
+  Pressable, ScrollView, StatusBar, StyleSheet, Switch, Text, TextInput, useColorScheme, View} from 'react-native';
 import {emptySettings, senderKey, validate} from './src/core.ts';
 import type {Delivery, Settings} from './src/core.ts';
 import * as service from './src/service.ts';
@@ -14,6 +14,9 @@ export default function App() {
   const [screen, setScreen] = useState<'setup' | 'status' | 'help' | 'voice'>('setup');
   const [previous, setPrevious] = useState<'setup' | 'status' | 'voice'>('setup');
   const [voiceSetup, setVoiceSetup] = useState(false);
+  const [deleteFrom, setDeleteFrom] = useState<'voice' | 'sms' | null>(null);
+  const [dialogHeight, setDialogHeight] = useState(0);
+  const dark = useColorScheme() === 'dark';
   const [transcript, setTranscript] = useState('');
   const actionLock = useRef(false);
   const [sender, setSender] = useState('');
@@ -69,17 +72,23 @@ export default function App() {
       {items.some(x => x.status === 'failed') ? button('Retry failed deliveries', () => act(async () => {await service.retry(); await service.flush();}), true) : null}</>;
   }
   const chooseTemplates = () => {setVoiceSetup(false); setScreen('setup'); setStep(0); setNotice('');};
+  function deleteLocalData() {
+    setDeleteFrom(null);
+    act(async () => {await service.remove(); setRule({...emptySettings}); setTranscript(''); setSavedPassword(false); setItems([]); chooseTemplates();});
+  }
   const test = () => act(async () => {await service.syntheticTest(rule); setNotice('Test sent ✓ The configured SMTP server accepted the synthetic email.');});
   if (!loaded) {return <View style={styles.loading}><ActivityIndicator color="#087b70" /><Text>Opening Relaybox…</Text></View>;}
   return <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
     <StatusBar barStyle="dark-content" backgroundColor="#f5f7fa" />
-    <View style={styles.header}><Text style={styles.brand}>Relaybox<Text style={styles.dot}> ●</Text></Text>
-      <Pressable accessibilityRole="button" onPress={() => {if (screen !== 'help') {setPrevious(screen); setScreen('help');} else {setScreen(previous);}}} style={styles.help}>
-        <Text style={styles.link}>{screen === 'help' ? 'Close help' : 'About / Help'}</Text></Pressable></View>
     <ScrollView key={`${screen}-${step}`} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+      <View style={styles.header}>
+        <Pressable accessibilityRole="button" onPress={() => {if (screen !== 'help') {setPrevious(screen); setScreen('help');} else {setScreen(previous);}}} style={[styles.help, styles.headerHelp]}>
+          <Text style={styles.link}>{screen === 'help' ? 'Close help' : 'About / Help'}</Text></Pressable>
+        <Text style={styles.brand}>Relaybox<Text style={styles.dot}> ●</Text></Text>
+      </View>
       {!service.available && screen !== 'help' ? <><Text style={styles.title}>Android templates</Text><View style={styles.card}><Text style={styles.section}>Forward SMS to email</Text><Text style={styles.body}>Unavailable on iOS. Incoming SMS access requires Android.</Text></View><View style={styles.card}><Text style={styles.section}>Talk to your agent</Text><Text style={styles.body}>Unavailable on iOS. Speech recognition is implemented for Android only.</Text></View></> : null}
       {screen === 'help' ? <>
-        <Text style={styles.eyebrow}>ABOUT / HELP</Text><Text style={styles.title}>Small rules. Clear boundaries.</Text>
+        <Text style={styles.eyebrow}>ABOUT / HELP</Text><Text android_hyphenationFrequency="normal" style={styles.title}>Small rules. Clear boundaries.</Text>
         <Text style={styles.section}>What works today</Text><Text style={styles.body}>Forward selected incoming Android SMS to an email address you configure. Nothing uses a Relaybox server. Talk to your agent lets you speak or type, review an editable transcript, then explicitly send it by email. No agent-side ingestion is included.</Text>
         <Text style={styles.section}>SMS is not RCS</Text><Text style={styles.body}>Only carrier SMS broadcasts are received. Chat messages sent over RCS, and messages inside other apps, are not captured. We do not detect RCS or read your message history.</Text>
         <Text style={styles.section}>Personal sideload, not a store release</Text><Text style={styles.body}>This is a debug APK installed outside an app store. Store SMS permissions are restricted and distribution has not been approved. Use only on your own device and accounts.</Text>
@@ -91,12 +100,12 @@ export default function App() {
       </> : service.available && screen === 'setup' ? <>
         <Text style={styles.eyebrow}>{voiceSetup ? 'TALK TO YOUR AGENT · EMAIL CONNECTION' : `STEP ${step + 1} OF 5 · ${steps[step].toUpperCase()}`}</Text>
         <View style={styles.progress}>{steps.map((x, i) => <View key={x} style={[styles.segment, i <= step && styles.segmentOn]} />)}</View>
-        {step === 0 ? <><Text style={styles.title}>A useful little automation.</Text><Text style={styles.body}>Choose a ready-to-use workflow. You decide what moves, and where it goes.</Text>
+        {step === 0 ? <><Text android_hyphenationFrequency="normal" style={styles.title}>A useful little automation.</Text><Text style={styles.body}>Choose a ready-to-use workflow. You decide what moves, and where it goes.</Text>
           <View style={styles.card}><Text style={styles.section}>Forward SMS to email</Text><Text style={styles.body}>Selected senders. Your inbox. A clear delivery trail.</Text><Text style={styles.badge}>AVAILABLE ON ANDROID</Text></View>
           <View style={styles.card}><Text style={styles.section}>Talk to your agent</Text><Text style={styles.body}>Speak. Review and edit. Send only when you choose.</Text>{button('Talk to your agent', () => {setScreen('voice'); setNotice('');})}</View>
           {rule.senders.length ? button('SMS delivery status', () => setScreen('status'), true) : null}
           {button('Set up SMS forwarding', () => setStep(1))}</> : null}
-        {step === 1 ? <><Text style={styles.title}>Who should we listen for?</Text><Text style={styles.body}>Add exact sender IDs, including names or phone numbers. Matching ignores letter case and surrounding spaces.</Text>
+        {step === 1 ? <><Text android_hyphenationFrequency="normal" style={styles.title}>Who should we listen for?</Text><Text style={styles.body}>Add exact sender IDs, including names or phone numbers. Matching ignores letter case and surrounding spaces.</Text>
           {field('Sender ID', sender, setSender, 'e.g. SAMPLE-BANK')}{button('Add sender', () => {if (sender.trim() && !rule.senders.some(x => senderKey(x) === senderKey(sender))) {patch({senders: [...rule.senders, sender.trim()]}); setSender('');}}, true, !sender.trim())}
           {rule.senders.map(x => <View key={x} style={styles.sender}><Text style={styles.senderText}>{x}</Text><Pressable accessibilityRole="button" accessibilityLabel={`Remove ${x}`} onPress={() => patch({senders: rule.senders.filter(y => y !== x)})} style={styles.help}><Text style={styles.link}>Remove</Text></Pressable></View>)}
           <View style={styles.warning}><Text style={styles.body}>Android grants access to all incoming SMS, even though your rule only forwards selected senders. We do not request message history. “Show recent senders” needs broader access and is not used.</Text></View>
@@ -106,7 +115,7 @@ export default function App() {
             if (!ok) {throw new Error('SMS access was denied. No SMS can be received. Allow it in Android app permissions, then return here.');}
           }), true) : <Text style={styles.success}>✓ Incoming SMS access granted</Text>}
           {button('Continue to email', () => setStep(2), false, !permission || !rule.senders.length)}</> : null}
-        {step === 2 ? <><Text style={styles.title}>Connect your own email.</Text><Text style={styles.body}>Messages go only through the server and destination you enter. Use your provider’s SMTP settings.</Text>
+        {step === 2 ? <><Text android_hyphenationFrequency="normal" style={styles.title}>Connect your own email.</Text><Text style={styles.body}>Messages go only through the server and destination you enter. Use your provider’s SMTP settings.</Text>
           {field('Destination email', voiceSetup ? rule.agentDestination || '' : rule.destination, v => patch(voiceSetup ? {agentDestination: v.trim()} : {destination: v.trim()}), 'you@example.com')}
           {voiceSetup ? field('Email subject', rule.agentSubject || '', v => patch({agentSubject: v}), 'A short subject for your agent') : null}
           {field('SMTP host', rule.host, v => patch({host: v.trim()}), 'smtp.example.com')}
@@ -117,13 +126,13 @@ export default function App() {
           {field('App password', password, setPassword, savedPassword ? 'Already saved securely' : 'Provider-created app password', true)}
           {button(savedPassword ? 'Replace saved app password' : 'Save app password', () => act(async () => {if (!password) {throw new Error('Enter an app password.');} await service.native.setPassword(password); setPassword(''); setSavedPassword(true); setNotice('App password saved securely.');}), true, !password)}
           {voiceSetup ? button('Save agent email connection', () => act(async () => {await service.saveAgent(rule); setVoiceSetup(false); setScreen('voice'); setNotice('Connection saved. Review your prompt before tapping Send.');}), false, !savedPassword || !!password) : button('Continue to message scope', () => {setNotice(''); setStep(3);}, false, !savedPassword || !!password || !rule.destination || !rule.host || !rule.username)}</> : null}
-        {step === 3 ? <><Text style={styles.title}>Choose what gets forwarded.</Text><Text style={styles.body}>A content filter is selected by default. It only applies to the sender IDs you added.</Text>
+        {step === 3 ? <><Text android_hyphenationFrequency="normal" style={styles.title}>Choose what gets forwarded.</Text><Text style={styles.body}>A content filter is selected by default. It only applies to the sender IDs you added.</Text>
           <View style={styles.card}><Text style={styles.section}>Forward all selected-sender messages</Text><Text style={styles.body}>Warning: this includes one-time verification codes and account information. Turn this on only if you deliberately want every message from these senders emailed.</Text>
             <Switch accessibilityLabel="Forward all messages, including verification codes" value={rule.scope === 'all'} onValueChange={all => patch({scope: all ? 'all' : 'filter'})} trackColor={{true: '#087b70'}} /></View>
           {rule.scope === 'filter' ? field('Only messages containing', rule.contains, v => patch({contains: v}), 'A word or phrase') : <Text style={styles.success}>All messages explicitly selected</Text>}
           <Text style={styles.caption}>The filter is plain text, case-insensitive. Empty filters do not forward anything.</Text>
           {button('Review rule', () => {const error = validate(rule); if (error) {setNotice(error);} else {setNotice(''); setStep(4);}}, false, rule.scope === 'filter' && !rule.contains.trim())}</> : null}
-        {step === 4 ? <><Text style={styles.title}>Your rule. Your choice.</Text><View style={styles.card}>
+        {step === 4 ? <><Text android_hyphenationFrequency="normal" style={styles.title}>Your rule. Your choice.</Text><View style={styles.card}>
           <Text style={styles.label}>FROM THESE SENDERS</Text><Text style={styles.body}>{rule.senders.join(', ')}</Text>
           <Text style={styles.label}>TO THIS EMAIL</Text><Text style={styles.body}>{rule.destination}</Text>
           <Text style={styles.label}>MESSAGE SCOPE</Text><Text style={styles.body}>{rule.scope === 'all' ? 'All messages, including verification codes and account information' : `Contains “${rule.contains}” (case-insensitive)`}</Text>
@@ -133,7 +142,7 @@ export default function App() {
           {button('Enable forwarding', () => act(async () => {if (!(await service.native.permission())) {throw new Error('SMS permission is missing. Go back to Senders to grant it.');} const next = {...rule, enabled: true}; await service.save(next); setRule(next); setScreen('status');}), false, !permission)}</> : null}
         {step > 0 ? button('Back', () => {setNotice(''); if (voiceSetup) {setVoiceSetup(false); setScreen('voice');} else {setStep(step - 1);}}, true) : null}
       </> : service.available && screen === 'voice' ? <>
-        <Text style={styles.eyebrow}>TALK TO YOUR AGENT</Text><Text style={styles.title}>Your words. Your next move.</Text>
+        <Text style={styles.eyebrow}>TALK TO YOUR AGENT</Text><Text android_hyphenationFrequency="normal" style={styles.title}>Your words. Your next move.</Text>
         <VoicePanel input={recognition} text={transcript} edit={setTranscript} busy={busy} styles={styles} send={() => act(async () => {
           const delivery = await service.sendPrompt(transcript); setTranscript('');
           setNotice(delivery.status === 'sent' ? 'Prompt sent ✓ Accepted by your SMTP server.' : 'Prompt queued. Delivery is not confirmed; check delivery status below. Do not send it again.');
@@ -141,16 +150,16 @@ export default function App() {
         <View style={styles.card}><Text style={styles.label}>EMAIL CONNECTION</Text><Text style={styles.body}>{rule.agentDestination || 'Not configured yet'}</Text><Text style={styles.caption}>Subject: {rule.agentSubject || 'Not configured yet'}</Text><Text style={styles.caption}>Uses the same SMTP connection and saved app password as SMS. Destination and subject are captured when you tap Send; retries keep that envelope.</Text></View>
         {button('Configure agent email', () => {setVoiceSetup(true); setStep(2); setScreen('setup'); setNotice('');}, true)}
         {button('Choose template', chooseTemplates, true)}
-        {button('Delete rule & local data', () => Alert.alert('Delete all local data?', 'This also deletes SMS settings, queued messages and the saved app password. Sent email cannot be recalled.', [{text: 'Cancel', style: 'cancel'}, {text: 'Delete', style: 'destructive', onPress: () => act(async () => {await service.remove(); setRule({...emptySettings}); setTranscript(''); setSavedPassword(false); setItems([]); chooseTemplates();})}]), true)}
+        {button('Delete rule & local data', () => {Keyboard.dismiss(); setDialogHeight(0); setDeleteFrom('voice');}, true)}
         {history()}
       </> : service.available && screen === 'status' ? <>
-        <Text style={styles.eyebrow}>FORWARD SMS TO EMAIL</Text><Text style={styles.title}>{rule.enabled ? 'Your rule is on.' : 'Forwarding is paused.'}</Text>
+        <Text style={styles.eyebrow}>FORWARD SMS TO EMAIL</Text><Text android_hyphenationFrequency="normal" style={styles.title}>{rule.enabled ? 'Your rule is on.' : 'Forwarding is paused.'}</Text>
         <View style={styles.card}><Text style={styles.section}>{rule.senders.join(', ')}</Text><Text style={styles.body}>→ {rule.destination}</Text><Text style={styles.caption}>{rule.scope === 'all' ? 'All selected-sender messages, including codes' : `Contains: ${rule.contains}`}</Text></View>
         {issue ? <View style={styles.warning}><Text style={styles.body}>{issue}</Text></View> : null}
         {button(rule.enabled ? 'Pause forwarding' : 'Resume forwarding', () => act(async () => {await service.toggle(); setRule(await service.settings());}))}
         {button('Send synthetic test email', test, true)}
         <View style={styles.actions}>{button('Edit rule', () => act(async () => {if (rule.enabled) {await service.toggle();} setRule(await service.settings()); setScreen('setup'); setStep(1);}), true)}
-          {button('Delete rule & local data', () => Alert.alert('Delete rule and all local data?', 'Queued messages, delivery history and the saved app password will be removed. Emails already sent cannot be recalled.', [{text: 'Cancel', style: 'cancel'}, {text: 'Delete', style: 'destructive', onPress: () => act(async () => {await service.remove(); setRule({...emptySettings}); setTranscript(''); setSavedPassword(false); setScreen('setup'); setStep(0); setItems([]);})}]), true)}</View>
+          {button('Delete rule & local data', () => {Keyboard.dismiss(); setDialogHeight(0); setDeleteFrom('sms');}, true)}</View>
         {button('Choose template', chooseTemplates, true)}
         {history()}
       </> : null}
@@ -158,24 +167,42 @@ export default function App() {
       {notice ? <View accessibilityLiveRegion="polite" style={styles.warning}><Text selectable style={styles.body}>{notice}</Text></View> : null}
       <Text style={styles.footer}>LOCAL FIRST · ONLY YOUR CONNECTION</Text>
     </ScrollView>
+    <Modal visible={deleteFrom !== null} transparent animationType="fade" onRequestClose={() => setDeleteFrom(null)}>
+      <View style={styles.dialogBackdrop} onLayout={event => setDialogHeight(event.nativeEvent.layout.height)}>
+        {dialogHeight > 0 ? <View accessibilityViewIsModal style={[styles.card, styles.dialogSheet, {height: Math.max(0, dialogHeight - 32)}, dark && styles.dialogDark]}>
+          <Text accessibilityRole="header" style={[styles.section, styles.dialogTitle, dark && styles.dialogLightText]}>{deleteFrom === 'voice' ? 'Delete all local data?' : 'Delete rule and all local data?'}</Text>
+          <ScrollView style={styles.dialogBody} contentContainerStyle={styles.dialogBodyContent} persistentScrollbar>
+            <Text style={[styles.body, dark && styles.dialogLightText]}>{deleteFrom === 'voice' ? 'This also deletes SMS settings, queued messages and the saved app password. Sent email cannot be recalled.' : 'Queued messages, delivery history and the saved app password will be removed. Emails already sent cannot be recalled.'}</Text>
+          </ScrollView>
+          <View style={styles.dialogFooter}>
+            <Pressable accessibilityRole="button" onPress={() => setDeleteFrom(null)} style={[styles.button, styles.secondary, dark && styles.dialogSecondaryDark]}><Text style={[styles.buttonText, styles.secondaryText, dark && styles.dialogLightText]}>Cancel</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityState={{disabled: busy}} disabled={busy} onPress={deleteLocalData} style={[styles.button, styles.danger, busy && styles.disabled]}><Text style={styles.buttonText}>Delete</Text></Pressable>
+          </View>
+        </View> : null}
+      </View>
+    </Modal>
   </KeyboardAvoidingView>;
 }
 export const styles = StyleSheet.create({
   root: {flex: 1, backgroundColor: '#f5f7fa', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 48, paddingBottom: 24},
   loading: {flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16},
-  header: {paddingHorizontal: 22, paddingVertical: 8, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between'},
+  header: {alignItems: 'flex-start', marginBottom: 16}, headerHelp: {alignSelf: 'flex-end'},
   brand: {fontSize: 24, fontWeight: '800', color: '#102436', letterSpacing: -0.8}, dot: {color: '#087b70', fontSize: 16},
   help: {paddingVertical: 12, paddingHorizontal: 4}, link: {color: '#086b63', fontWeight: '700', fontSize: 14},
-  content: {padding: 22, paddingBottom: 36, flexGrow: 1}, eyebrow: {fontSize: 12, color: '#436071', fontWeight: '800', letterSpacing: 1.1, marginBottom: 16},
+  content: {padding: 16, paddingBottom: 36, flexGrow: 1}, eyebrow: {fontSize: 12, color: '#436071', fontWeight: '800', letterSpacing: 1.1, marginBottom: 16},
   progress: {flexDirection: 'row', gap: 6, marginBottom: 26}, segment: {height: 4, backgroundColor: '#dce4e9', flex: 1, borderRadius: 3}, segmentOn: {backgroundColor: '#087b70'},
-  title: {fontSize: 32, lineHeight: 39, fontWeight: '800', letterSpacing: -0.7, color: '#102436', marginBottom: 16},
+  title: {fontSize: 32, lineHeight: 39, fontWeight: '800', color: '#102436', marginBottom: 16},
   body: {fontSize: 16, lineHeight: 24, color: '#354c5e', marginBottom: 12}, section: {fontSize: 19, fontWeight: '700', color: '#102436', marginBottom: 10, marginTop: 4},
-  card: {backgroundColor: '#fff', borderColor: '#dce4e9', borderWidth: 1, borderRadius: 18, padding: 18, marginVertical: 8},
+  card: {backgroundColor: '#fff', borderColor: '#dce4e9', borderWidth: 1, borderRadius: 18, padding: 12, marginVertical: 8},
   badge: {fontSize: 11, fontWeight: '800', color: '#087b70', letterSpacing: 1}, label: {fontSize: 14, fontWeight: '700', color: '#243d50', marginBottom: 8},
   field: {marginVertical: 8}, input: {minHeight: 52, backgroundColor: '#fff', borderColor: '#b5c4ce', borderWidth: 1, borderRadius: 12, paddingHorizontal: 14, color: '#102436', fontSize: 16},
   button: {minHeight: 52, alignItems: 'center', justifyContent: 'center', backgroundColor: '#087b70', borderRadius: 12, padding: 14, marginVertical: 6},
   buttonText: {fontSize: 16, fontWeight: '700', color: '#fff', textAlign: 'center'}, secondary: {backgroundColor: '#e6eeef'}, secondaryText: {color: '#15574f'}, disabled: {opacity: 0.45},
   warning: {backgroundColor: '#fff1d6', borderRadius: 14, padding: 16, marginVertical: 12}, success: {color: '#086b63', fontWeight: '700', marginVertical: 12},
-  caption: {color: '#526779', fontSize: 13, lineHeight: 20, marginBottom: 8}, sender: {flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12}, senderText: {fontSize: 17, color: '#102436', flex: 1},
+  caption: {color: '#526779', fontSize: 13, lineHeight: 20, marginBottom: 8}, sender: {alignItems: 'flex-start', gap: 4}, senderText: {fontSize: 17, color: '#102436', alignSelf: 'stretch'},
   actions: {marginTop: 8}, error: {color: '#923c24', fontSize: 14, lineHeight: 21}, busy: {margin: 16}, footer: {fontSize: 10, color: '#526779', textAlign: 'center', letterSpacing: 1.5, marginTop: 32},
+  dialogBackdrop: {flex: 1, justifyContent: 'center', padding: 16, backgroundColor: 'rgba(16,36,54,0.6)'},
+  dialogSheet: {marginVertical: 0, padding: 16, backgroundColor: '#f5f7fa'},
+  dialogTitle: {flexShrink: 0}, dialogBody: {flex: 1, minHeight: 0}, dialogBodyContent: {paddingRight: 8}, dialogFooter: {flexShrink: 0},
+  dialogDark: {backgroundColor: '#102436', borderColor: '#526779'}, dialogLightText: {color: '#f5f7fa'}, dialogSecondaryDark: {backgroundColor: '#243d50'}, danger: {backgroundColor: '#923c24'},
 });
