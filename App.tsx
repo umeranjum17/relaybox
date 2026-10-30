@@ -139,7 +139,7 @@ export default function App() {
 const styles = StyleSheet.create({
   root: {flex: 1, backgroundColor: '#f5f7fa', paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 24 : 48, paddingBottom: 24},
   loading: {flex: 1, justifyContent: 'center', alignItems: 'center', gap: 16},
-  header: {paddingHorizontal: 22, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between'},
+  header: {paddingHorizontal: 22, paddingVertical: 8, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between'},
   brand: {fontSize: 24, fontWeight: '800', color: '#102436', letterSpacing: -0.8}, dot: {color: '#087b70', fontSize: 16},
   help: {paddingVertical: 12, paddingHorizontal: 4}, link: {color: '#086b63', fontWeight: '700', fontSize: 14},
   content: {padding: 22, paddingBottom: 36, flexGrow: 1}, eyebrow: {fontSize: 12, color: '#436071', fontWeight: '800', letterSpacing: 1.1, marginBottom: 16},
