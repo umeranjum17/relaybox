@@ -93,9 +93,9 @@ Each email includes `X-Relaybox-Id`, a generated MIME `Message-ID`, `Date`, and 
 Deleting local data from either template deletes both templates' settings, queue and shared credential.
 There is no mailbox reader or agent execution adapter; email acceptance is not agent acceptance.
 
-Debug APKs alone offer **Use DEBUG transcript substitute**. This clearly labelled substitute produces
+Debug and debuggable sideload APKs offer **Use DEBUG transcript substitute**. This clearly labelled substitute produces
 a known synthetic transcript when Finish speaking is tapped; editing, Send, storage, SMTP and history
-are real. The fixture implementation lives only in `android/app/src/debug`; the release factory rejects
+are real. The fixture implementation lives only in `android/app/src/debug` (also used by the debuggable sideload source set); the release factory rejects
 substitution and contains no fixture transcript. Release signing/distribution remains out of scope.
 
 ## Small architecture
@@ -271,7 +271,19 @@ not final-head proof. No physical phone or real mailbox was used in this lane.
 | iOS / real phone / real provider / audio transcription | **Not tested**; iOS visibly unavailable in source | No parity or physical-phone speech claim |
 
 Five host tests pass (none skipped), including the original socket-backed journal test extended with
-voice delivery while SMS is paused. No release APK or speech accuracy test was performed.
+voice delivery while SMS is paused. Proof uses the development-debug x86_64 split, built with the
+SMS lane's original command below. The current size-limited sideload recipe above is retained;
+no release APK or speech accuracy test was performed.
+
+```sh
+cd android
+./gradlew --no-daemon --max-workers=2 assembleDebug -PreactNativeArchitectures=arm64-v8a,x86_64
+# Development emulator APK: app/build/outputs/apk/debug/app-x86_64-debug.apk
+```
+
+For a task-private done-done run, copy the existing global judge configuration into a private
+`DONE_DONE_HOME` and change only that copy's `evidence.local_root` to the task's retained directory.
+`done-done run --open`, real UI driving, `run --close` and `receipt` seal this proof; no verify skill.
 
 For concurrent lanes, leave another catcher alone: bind your own STARTTLS catcher to a free host port
 (this lane uses **127.0.0.1:2601**) and map only your own device:
