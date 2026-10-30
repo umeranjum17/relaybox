@@ -1,0 +1,5 @@
+{
+  "extends": "@react-native/typescript-config/tsconfig.json",
+  "compilerOptions": {"allowImportingTsExtensions": true, "strict": true, "types": ["react-native", "node"]},
+  "exclude": ["node_modules", "ios/Pods"]
+}
