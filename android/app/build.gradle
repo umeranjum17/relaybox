@@ -87,7 +87,7 @@ android {
         abi {
             enable true
             reset()
-            include(*reactNativeArchitectures())
+            include(*project.property("reactNativeArchitectures").split(","))
             universalApk false
         }
     }
