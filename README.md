@@ -19,17 +19,31 @@ export JAVA_HOME=/path/to/your/jdk
 npm test
 npx tsc --noEmit
 cd android
-./gradlew --no-daemon --max-workers=2 assembleDebug -PreactNativeArchitectures=arm64-v8a,x86_64
+./gradlew --no-daemon --max-workers=2 assembleSideload
 cd ..
-adb -s YOUR_SERIAL install -r android/app/build/outputs/apk/debug/app-debug.apk
+adb -s YOUR_SERIAL install -r android/app/build/outputs/apk/sideload/app-arm64-v8a-sideload.apk
 adb -s YOUR_SERIAL shell am start -n com.relaybox.app/com.relaybox.MainActivity
 ```
 
-The debug APK contains its JavaScript bundle and works **without Metro**.
-Package: `com.relaybox.app`; label: **Relaybox**. The two selected ABIs cover the tested
-arm64 phone and x86_64 emulator. Omit the architecture argument for all template ABIs.
-This is a debug-signed sideload, not a store-ready or hardened production release.
-Never distribute a release signed with the template debug key.
+The standard output is a single **arm64-v8a** APK, with R8 minification, resource
+shrinking, release native libraries and bundled Hermes JavaScript (**no Metro**).
+ABI splits are enabled without a universal APK. The owner transfer limit is
+**30,000,000 bytes**, not 30 MiB; check the file size before handing it off.
+
+For an x86_64 emulator, use the same recipe with an architecture override:
+
+```sh
+cd android
+./gradlew --no-daemon --max-workers=2 assembleSideload -PreactNativeArchitectures=x86_64
+# Output: app/build/outputs/apk/sideload/app-x86_64-sideload.apk
+```
+
+Package: `com.relaybox.app`; label: **Relaybox**. Both sideload variants reuse the
+repository's template debug keystore, remain debuggable, and retain the debug-only
+localhost test transport/CA. This is a personal sideload, **not a store release**.
+Do not use the template key for store distribution. `assembleDebug` remains available
+for development; it is not the size-limited handoff recipe. `assembleRelease` is
+shrunk too, but excludes the localhost test transport and CA.
 
 ## Setup: five small steps
 
@@ -93,7 +107,7 @@ Storage/receive failures are shown as an operational warning; SMTP failures appe
   computer can inspect app memory; this is not protection from a compromised phone.
 - Exact sender IDs are **not proof of sender authenticity**. Do not use forwarded SMS as an agent
   execution authorization mechanism. There is no inbound-email/agent execution feature here.
-- Debug builds additionally allow **verified STARTTLS to `localhost:2525` only**, for local test
+- Debug and sideload builds additionally allow **verified STARTTLS to `localhost:2525` only**, for local test
   catchers. The debug-only network configuration trusts the repository's public synthetic test CA
   for exactly `localhost`. Its private key is not in this repository. Release builds do not allow
   that port or include that trust anchor. No cleartext SMTP fallback exists.
@@ -171,13 +185,37 @@ For local Android testing, bind a tiny STARTTLS catcher to host `127.0.0.1:2525`
 ```sh
 adb -s YOUR_SERIAL reverse tcp:2525 tcp:2525
 # In onboarding: localhost / 2525, neutral synthetic accounts and password.
-# To use your own catcher key, regenerate the localhost-only test CA and rebuild.
+# To use your own catcher key, regenerate the localhost-only test CA below and rebuild.
 adb -s YOUR_EMULATOR emu sms send SAMPLE-BANK 'Your code is 4321'
 adb -s YOUR_EMULATOR emu sms send OTHER-SHOP 'Unrelated synthetic message'
 ```
 
 The catcher must support TLS and authentication. Do not point the test at a public mailbox or
 remove TLS checks. Reverse mappings are transient and must be restored after emulator reboot.
+
+The previous test CA was rotated for the size-limited sideload proof. Its private key
+is deliberately not shipped. To create your own local catcher identity, run from the
+repository root (keep `$TLS_DIR` outside the repository; commit **only** the public CA):
+
+```sh
+export TLS_DIR=/absolute/private/task-directory/tls
+mkdir -p "$TLS_DIR"
+umask 077
+openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+  -subj '/CN=Relaybox local synthetic test CA' \
+  -keyout "$TLS_DIR/ca.key" -out android/app/src/debug/res/raw/relaybox_test_ca.pem
+openssl req -new -newkey rsa:2048 -nodes -subj '/CN=localhost' \
+  -keyout "$TLS_DIR/server.key" -out "$TLS_DIR/server.csr"
+printf 'subjectAltName=DNS:localhost\nextendedKeyUsage=serverAuth\n' > "$TLS_DIR/server.ext"
+openssl x509 -req -in "$TLS_DIR/server.csr" \
+  -CA android/app/src/debug/res/raw/relaybox_test_ca.pem -CAkey "$TLS_DIR/ca.key" \
+  -CAserial "$TLS_DIR/ca.srl" -CAcreateserial -days 30 \
+  -extfile "$TLS_DIR/server.ext" -out "$TLS_DIR/server.pem"
+```
+
+Rebuild `assembleSideload` after replacing the public CA. Configure the loopback
+catcher with `server.pem` / `server.key`; require STARTTLS before authentication.
+Never add a trust-all socket factory or disable hostname verification.
 
 ## Next (not implemented)
 
