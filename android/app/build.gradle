@@ -115,6 +115,7 @@ android {
         }
         sideload {
             initWith release
+            shrinkResources true
             // Release native libraries keep the APK small; DEBUG gates only the local test transport.
             matchingFallbacks = ["release"]
             debuggable true
