@@ -33,10 +33,10 @@ ABI splits are enabled without a universal APK. The owner transfer limit is
 Current large-text handoff artifact, built with that command (both templates present;
 source HEAD and device captures are recorded in the accompanying PR evidence):
 `android/app/build/outputs/apk/sideload/app-arm64-v8a-sideload.apk`,
-**15,931,108 bytes**, SHA-256:
+**15,932,188 bytes**, SHA-256:
 
 ```text
-9870702f0a6beea17213a29d75754f277d90fbf1faa4f30709fc6c38705fedf1
+fa90bf19a85a50bf069d2974b086beed3a61ab9c8b15ca121e97b67d7a51cae5
 ```
 
 For an x86_64 emulator, use the same recipe with an architecture override:
@@ -76,6 +76,10 @@ The status screen offers pause/resume, edit, delete, synthetic test and retry of
 Editing pauses first; pending deliveries use the newly saved connection on resumption.
 Pause holds queued messages and ignores new SMS; an already-sending email can finish.
 “Sent” means the SMTP server accepted the email, **not** that an inbox received it.
+Delete opens an app-owned disclosure: its title wraps, its message scrolls independently,
+and Cancel/Delete remain outside the message viewport. Cancel or Back only dismisses it;
+local data is removed only after the explicit Delete action. The disclosure supports light
+and dark app appearance without capping the system text scale.
 
 ## Talk to your agent
 
