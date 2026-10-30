@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+  <base-config cleartextTrafficPermitted="false"><trust-anchors><certificates src="system" /></trust-anchors></base-config>
+  <!-- Debug-only, exact loopback hostname. No public host gets this trust anchor. -->
+  <domain-config cleartextTrafficPermitted="false">
+    <domain includeSubdomains="false">localhost</domain>
+    <trust-anchors><certificates src="@raw/relaybox_test_ca" /><certificates src="system" /></trust-anchors>
+  </domain-config>
+</network-security-config>
