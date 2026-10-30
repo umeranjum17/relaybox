@@ -150,7 +150,7 @@ export default function App() {
         {button(rule.enabled ? 'Pause forwarding' : 'Resume forwarding', () => act(async () => {await service.toggle(); setRule(await service.settings());}))}
         {button('Send synthetic test email', test, true)}
         <View style={styles.actions}>{button('Edit rule', () => act(async () => {if (rule.enabled) {await service.toggle();} setRule(await service.settings()); setScreen('setup'); setStep(1);}), true)}
-          {button('Delete rule & local data', () => Alert.alert('Delete rule and all local data?', 'Queued messages, delivery history and the saved app password will be removed. Emails already sent cannot be recalled.', [{text: 'Cancel', style: 'cancel'}, {text: 'Delete', style: 'destructive', onPress: () => act(async () => {await service.remove(); setRule({...emptySettings}); setSavedPassword(false); setScreen('setup'); setStep(0); setItems([]);})}]), true)}</View>
+          {button('Delete rule & local data', () => Alert.alert('Delete rule and all local data?', 'Queued messages, delivery history and the saved app password will be removed. Emails already sent cannot be recalled.', [{text: 'Cancel', style: 'cancel'}, {text: 'Delete', style: 'destructive', onPress: () => act(async () => {await service.remove(); setRule({...emptySettings}); setTranscript(''); setSavedPassword(false); setScreen('setup'); setStep(0); setItems([]);})}]), true)}</View>
         {button('Choose template', chooseTemplates, true)}
         {history()}
       </> : null}

@@ -109,8 +109,12 @@ class RelayModule(private val context: ReactApplicationContext) : ReactContextBa
   }
   @ReactMethod fun newId(p: Promise) { p.resolve(java.util.UUID.randomUUID().toString()) }
   @ReactMethod fun voicePending(value: Boolean, p: Promise) = run(p) {
-    check(RelayDisk.prefs(context).edit().putBoolean("voicePending", value).commit())
-    RelaySchedule.heartbeat(context, value || RelayDisk.prefs(context).getBoolean("enabled", false)); null
+    val prefs = RelayDisk.prefs(context)
+    if (prefs.getBoolean("voicePending", false) != value) {
+      check(prefs.edit().putBoolean("voicePending", value).commit())
+      RelaySchedule.heartbeat(context, value || prefs.getBoolean("enabled", false))
+    }
+    null
   }
   @ReactMethod fun wake(p: Promise) = run(p) { RelaySchedule.wake(context); null }
   @ReactMethod fun permission(p: Promise) { p.resolve(context.checkSelfPermission(Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED) }

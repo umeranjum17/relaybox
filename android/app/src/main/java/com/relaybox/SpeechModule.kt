@@ -28,12 +28,19 @@ class AndroidSpeech(
 ) : SpeechSession, RecognitionListener {
   private var recognizer: SpeechRecognizer? = null
   private var engine = ""
+  private var local = false
+  private var fallback = false
   override fun start() {
     if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
       result(null, "Microphone access denied. Retry or allow Microphone in app Settings."); return
     }
     try {
-      val local = Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+      local = Build.VERSION.SDK_INT >= 31 && SpeechRecognizer.isOnDeviceRecognitionAvailable(context)
+      begin()
+    } catch (_: Exception) { result(null, "Speech recognizer could not start. Retry or type your prompt.") }
+  }
+  private fun begin() {
+    try {
       engine = if (local) "Android on-device SpeechRecognizer" else
         "Android SpeechRecognizer · ${Settings.Secure.getString(context.contentResolver, "voice_recognition_service") ?: "system default"}"
       if (!local && !SpeechRecognizer.isRecognitionAvailable(context)) {
@@ -44,7 +51,7 @@ class AndroidSpeech(
       state("processing", engine)
       recognizer!!.startListening(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+        putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, !fallback)
         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
       })
     } catch (_: Exception) { result(null, "Speech recognizer could not start. Retry or type your prompt.") }
@@ -59,7 +66,14 @@ class AndroidSpeech(
     if (text.isNullOrBlank()) result(null, "No speech matched. Retry or type your prompt.") else result(text, null)
   }
   override fun onError(error: Int) {
+    // A service can exist without a downloaded language pack (observed on a fresh emulator).
+    // Try the real system recognizer once, not a synthetic speech result.
+    if (local && (error == SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE || error == SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED)) {
+      local = false; fallback = true; recognizer?.destroy(); recognizer = null; begin(); return
+    }
     val message = when (error) {
+      SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE, SpeechRecognizer.ERROR_LANGUAGE_NOT_SUPPORTED -> "Speech language unavailable. Enable or download your language in system speech settings, then Retry. You can still type."
+      SpeechRecognizer.ERROR_AUDIO -> "Microphone audio could not be read. Check system microphone access, then Retry."
       SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech heard. Retry and speak after Listening appears."
       SpeechRecognizer.ERROR_NO_MATCH -> "No speech matched. Retry or type your prompt."
       SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "Microphone access denied. Retry or allow Microphone in app Settings."
