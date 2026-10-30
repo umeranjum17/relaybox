@@ -92,7 +92,7 @@ android {
         }
     }
     // Keep local verified-STARTTLS testing available in the sideload build.
-    sourceSets { sideload { manifest.srcFile "src/debug/AndroidManifest.xml"; res.srcDir "src/debug/res" } }
+    sourceSets { sideload { manifest.srcFile "src/debug/AndroidManifest.xml"; res.srcDir "src/debug/res"; java.srcDir "src/debug/java" } }
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -116,7 +116,7 @@ android {
         sideload {
             initWith release
             shrinkResources true
-            // Release native libraries keep the APK small; DEBUG gates only the local test transport.
+            // Release native libraries keep the APK small; this debuggable variant retains local proof seams.
             matchingFallbacks = ["release"]
             debuggable true
             signingConfig signingConfigs.debug

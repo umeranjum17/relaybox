@@ -1,0 +1,14 @@
+app: relaybox-voice
+approved_requirements:
+  - kind: spec
+    name: Editable prompt with explicit human Send
+    requirement: The real Android voice template shows an editable transcript and a clearly labelled Send prompt by email action; debug substitution is visibly disclosed, not represented as real speech.
+    capture: voice-edited.png
+  - kind: spec
+    name: Real recognizer listening
+    requirement: The real Android template shows Listening and the Android speech recognizer actually selected, with cancellation available; no substituted transcript is claimed as real speech.
+    capture: real-listening.png
+  - kind: spec
+    name: Shared durable delivery history
+    requirement: The template shows Talk to your agent delivery marked SENT in its delivery history, without exposing the prompt body in that history.
+    capture: voice-sent.png

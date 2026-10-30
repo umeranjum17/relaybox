@@ -87,7 +87,7 @@ object RelaySchedule {
 }
 
 class RelayPackage : ReactPackage {
-  override fun createNativeModules(c: ReactApplicationContext) = listOf(RelayModule(c))
+  override fun createNativeModules(c: ReactApplicationContext) = listOf(RelayModule(c), SpeechModule(c))
   override fun createViewManagers(c: ReactApplicationContext): List<ViewManager<*, *>> = emptyList()
 }
 class RelayModule(private val context: ReactApplicationContext) : ReactContextBaseJavaModule(context) {
@@ -105,7 +105,16 @@ class RelayModule(private val context: ReactApplicationContext) : ReactContextBa
   @ReactMethod fun pending(p: Promise) = run(p) { RelayDisk.pending(context).toString() }
   @ReactMethod fun ack(ids: ReadableArray, p: Promise) = run(p) { RelayDisk.ack(context, ids.toArrayList().map { it as String }.toSet()); null }
   @ReactMethod fun enabled(enabled: Boolean, p: Promise) = run(p) {
-    check(RelayDisk.prefs(context).edit().putBoolean("enabled", enabled).commit()); RelaySchedule.heartbeat(context, enabled); null
+    check(RelayDisk.prefs(context).edit().putBoolean("enabled", enabled).commit()); RelaySchedule.heartbeat(context, enabled || RelayDisk.prefs(context).getBoolean("voicePending", false)); null
+  }
+  @ReactMethod fun newId(p: Promise) { p.resolve(java.util.UUID.randomUUID().toString()) }
+  @ReactMethod fun voicePending(value: Boolean, p: Promise) = run(p) {
+    val prefs = RelayDisk.prefs(context)
+    if (prefs.getBoolean("voicePending", false) != value) {
+      check(prefs.edit().putBoolean("voicePending", value).commit())
+      RelaySchedule.heartbeat(context, value || prefs.getBoolean("enabled", false))
+    }
+    null
   }
   @ReactMethod fun wake(p: Promise) = run(p) { RelaySchedule.wake(context); null }
   @ReactMethod fun permission(p: Promise) { p.resolve(context.checkSelfPermission(Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED) }
@@ -150,9 +159,8 @@ class RelayModule(private val context: ReactApplicationContext) : ReactContextBa
         }
         p.resolve(null)
       } catch (e: Exception) {
-        var reason = "${e.javaClass.simpleName}: ${e.message ?: "SMTP connection failed"}"
-        for (secret in listOf(password, body).filter { it.isNotEmpty() }) reason = reason.replace(secret, "[redacted]")
-        p.reject("SMTP", reason.take(600))
+        // Provider errors may echo message text or credentials: retain only a safe category.
+        p.reject("SMTP", "Email was not confirmed (${e.javaClass.simpleName}). Check your connection and retry in delivery history.")
       }
     }
   }

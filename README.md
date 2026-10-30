@@ -1,7 +1,7 @@
 # Relaybox
 
-A small personal automation app. **Today: Android incoming SMS → your own email.**
-Select exact sender IDs, optionally require a phrase, review the scope, then enable.
+A small personal automation app. **Two Android templates: SMS → email, and Talk to your agent.**
+Select exact SMS senders, or speak a prompt, edit its transcript and explicitly send it by email.
 There is no hosted service, analytics, mailbox integration, voice recording or generic workflow builder.
 
 ## Build & install
@@ -47,7 +47,7 @@ shrunk too, but excludes the localhost test transport and CA.
 
 ## Setup: five small steps
 
-1. **Template:** choose “Forward SMS to email”. “Talk to your agent” is visibly unavailable.
+1. **Template:** choose “Forward SMS to email”. For the second template, see below.
 2. **Senders:** add/remove exact alphanumeric sender IDs or phone numbers. No prefilled sender.
    Grant incoming-SMS permission after reading the broad-access explanation. Android's permission
    dialog may say “send and view”; the app requests `RECEIVE_SMS`, not `READ_SMS` or `SEND_SMS`.
@@ -68,14 +68,47 @@ Editing pauses first; pending deliveries use the newly saved connection on resum
 Pause holds queued messages and ignores new SMS; an already-sending email can finish.
 “Sent” means the SMTP server accepted the email, **not** that an inbox received it.
 
+## Talk to your agent
+
+Choose **Talk to your agent** from Template (also reachable through **Choose template** on SMS status).
+Open **Configure agent email**, enter a destination and subject, and save the connection. SMTP host,
+port, username and secure app password are shared with SMS; the agent destination is independent.
+Nothing enables SMS or requests SMS permission in this flow.
+
+Read the microphone explanation, tap **Push to talk**, allow Microphone, and speak after **Listening…**
+appears. Tap **Finish speaking** to process, or **Cancel recognition** to discard the recognition attempt.
+The selected recognizer is shown on screen. Android's on-device recognizer is preferred on API31+;
+if its language pack is missing, the app tries the real system recognizer once. That provider may use
+its network service. Relaybox never stores audio or emits audio buffers to JavaScript.
+
+The transcript is a normal multiline editable field: edit, clear, or type from scratch. Only
+**Send prompt by email** creates a durable delivery. Denial, silence, no match, cancellation and
+recognizer failures leave Retry and manual typing available; permanently denied permission can be
+changed with **Open app permissions**. Drafts live in memory, not on disk, and disappear on process exit.
+Queued prompts are encrypted with the same vault/journal as SMS, scrubbed after sending, and shown
+in the same delivery history without their bodies. Failed deliveries retry with the same UUID;
+exhausted failures offer **Retry failed deliveries**. SMS pause does not pause explicitly sent prompts.
+Destination and subject are captured on Send; retry uses that envelope and the current SMTP connection.
+Each email includes `X-Relaybox-Id`, a generated MIME `Message-ID`, `Date`, and a body UUID/UTC timestamp.
+Deleting local data from either template deletes both templates' settings, queue and shared credential.
+There is no mailbox reader or agent execution adapter; email acceptance is not agent acceptance.
+
+Debug and debuggable sideload APKs offer **Use DEBUG transcript substitute**. This clearly labelled substitute produces
+a known synthetic transcript when Finish speaking is tapped; editing, Send, storage, SMTP and history
+are real. The fixture implementation lives only in `android/app/src/debug` (also used by the debuggable sideload source set); the release factory rejects
+substitution and contains no fixture transcript. Release signing/distribution remains out of scope.
+
 ## Small architecture
 
-- `src/core.ts`: typed `Template` registry (one entry), trigger → exact-sender/content filter →
+- `src/core.ts`: typed `Template` registry (two entries), trigger → exact-sender/content filter →
   `Transport`; multipart assembly and durable queue state transitions. No native modules are mocked
   inside this engine. Sender matching trims and lowercases; phone formatting is otherwise exact.
 - `src/service.ts`: one serialized lane shared by UI and headless work. One JSON settings value
   and a JSON event journal in AsyncStorage. No app-managed SQL schema or database dependency.
   Sent payloads are scrubbed from prior journal events; terminal metadata/dedupe lasts seven days.
+- `src/recognition.ts`: shared substitutable recognition interface and permission/result boundary.
+  `VoicePanel.tsx` uses that interface, not Android. `nativeRecognition.ts` adapts Android permissions
+  and events; `SpeechModule.kt` owns `SpeechRecognizer`, lifecycle cancellation and a 45-second deadline.
 - `SmsReceiver.kt`: Android's multipart broadcast → encrypted, atomically replaced private inbox.
   SHA-256 identity covers normalized sender, received timestamp, part count and full body.
   Acknowledgement removes inbox entries only after the JS journal write succeeds.
@@ -108,9 +141,11 @@ Storage/receive failures are shown as an operational warning; SMTP failures appe
 - Exact sender IDs are **not proof of sender authenticity**. Do not use forwarded SMS as an agent
   execution authorization mechanism. There is no inbound-email/agent execution feature here.
 - Debug and sideload builds additionally allow **verified STARTTLS to `localhost:2525` only**, for local test
-  catchers. The debug-only network configuration trusts the repository's public synthetic test CA
-  for exactly `localhost`. Its private key is not in this repository. Release builds do not allow
-  that port or include that trust anchor. No cleartext SMTP fallback exists.
+  catchers. The debug-only network configuration trusts both public synthetic anchors
+  `relaybox_test_ca.pem` and the additive `relaybox_voice_test_ca.pem` for exactly `localhost`.
+  No private key is committed. Release builds allow neither that port nor those anchors.
+  No cleartext SMTP fallback exists. SMTP errors retain only a safe exception category, never a
+  provider's potentially content-bearing error text.
 
 ## Android and distribution limits
 
@@ -128,8 +163,8 @@ Policy/reference check: 30 October 2026:
 [Android permission reference](https://developer.android.com/reference/android/Manifest.permission#RECEIVE_SMS),
 [SMS broadcast contract](https://developer.android.com/reference/android/provider/Telephony.Sms.Intents).
 
-iOS project scaffolding is retained, but **not built or tested**. Shared UI marks SMS unavailable on
-iOS; no SMS-native implementation or parity claim is made.
+iOS project scaffolding is retained, but **not built or tested**. Shared UI marks both SMS and
+Talk to your agent visibly unavailable on iOS; no native implementation or parity claim is made.
 
 ## Verification
 
@@ -139,7 +174,7 @@ small local SMTP socket server. This host journey does **not** substitute for An
 `npx tsc --noEmit` checks application and test sources. No production mailbox was used for
 acceptance; every configured address and injected SMS was synthetic.
 
-### This APK's proof matrix — 30 October 2026
+### Shipped SMS lane's historical proof matrix — 30 October 2026
 
 The retained APK was built from implementation commit `880217f4c650699a90a2b893a588cdea10ffb0ad`.
 The subsequent README update changes documentation only, not application/build sources.
@@ -216,10 +251,74 @@ openssl x509 -req -in "$TLS_DIR/server.csr" \
 Rebuild `assembleSideload` after replacing the public CA. Configure the loopback
 catcher with `server.pem` / `server.key`; require STARTTLS before authentication.
 Never add a trust-all socket factory or disable hostname verification.
+### Talk-to-agent lane proof matrix — 30 October 2026
+
+The final-head record, exact APK hash, host checks, UI captures and synthetic MIME are retained outside
+this repository in `data/voice-prompt-to-agent-template-v1/`. `final-head.txt` identifies the commit;
+`final-report.md` identifies the sealed capture run. Earlier `preliminary-*` captures are exploratory,
+not final-head proof. No physical phone or real mailbox was used in this lane.
+
+| Check | Task-owned Android emulator (API36, x86_64) | Host / source checks |
+| --- | --- | --- |
+| Fresh install, choose voice template, configure email | Real UI and exact installed APK hash | Clean clone: npm ci, npm test, tsc, documented Gradle command |
+| Listening → processing → editable transcript → one Send | **DEBUG recognition substituted**, explicitly labelled; editing, Send, encrypted queue and verified STARTTLS are real | Substitutable recognition contract |
+| Real recognition start / listening / cancellation | Real Android SpeechRecognizer; on-device language pack absent, real system Google TTS recognizer fallback; no invented speech result | Android implementation compiled |
+| Microphone denial → recoverable Retry | Real system denial, visible message; retry then grant | Denied-permission contract |
+| Silence / no-match / retry | Real silent attempt ends recoverably; no spoken-phone transcription claim | Empty-result, silence, cancellation and successful retry contract |
+| Subject / unique ID / UTC timestamp / edited body | Received synthetic MIME at host 127.0.0.1:2601 via device2525 adb reverse | Envelope snapshot, UUID preservation and scrub checks |
+| Send failure / delivery history / recovery | Real catcher rejection visible as retrying; same pending delivery later accepted | Restart, backoff, exhaustion and retry tests |
+| SMS regression | Five-step setup, test, background incoming SMS, unrelated sender/content exclusion, pause/resume | Existing SMS suite retained |
+| iOS / real phone / real provider / audio transcription | **Not tested**; iOS visibly unavailable in source | No parity or physical-phone speech claim |
+
+Five host tests pass (none skipped), including the original socket-backed journal test extended with
+voice delivery while SMS is paused. Proof uses the development-debug x86_64 split, built with the
+SMS lane's original command below. The current size-limited sideload recipe above is retained;
+no release APK or speech accuracy test was performed.
+
+```sh
+cd android
+./gradlew --no-daemon --max-workers=2 assembleDebug -PreactNativeArchitectures=arm64-v8a,x86_64
+# Development emulator APK: app/build/outputs/apk/debug/app-x86_64-debug.apk
+```
+
+For a task-private done-done run, copy the existing global judge configuration into a private
+`DONE_DONE_HOME` and change only that copy's `evidence.local_root` to the task's retained directory.
+`done-done run --open`, real UI driving, `run --close` and `receipt` seal this proof; no verify skill.
+
+For concurrent lanes, leave another catcher alone: bind your own STARTTLS catcher to a free host port
+(this lane uses **127.0.0.1:2601**) and map only your own device:
+
+```sh
+adb -s YOUR_SERIAL reverse tcp:2525 tcp:2601
+adb -s YOUR_SERIAL reverse --list
+```
+
+The app still uses `localhost:2525`. Debug XML retains the original
+`android/app/src/debug/res/raw/relaybox_test_ca.pem` and adds
+`android/app/src/debug/res/raw/relaybox_voice_test_ca.pem`. To regenerate only your own voice anchor,
+keep keys outside the checkout, retain the original anchor, copy only the new public CA and rebuild:
+
+```sh
+d=$(mktemp -d) # private task scratch, never commit or log its keys
+chmod 700 "$d"
+openssl req -x509 -newkey rsa:2048 -nodes -keyout "$d/ca.key" -out "$d/ca.pem" -days 3650 -subj '/CN=Relaybox Voice Synthetic Test CA'
+openssl req -newkey rsa:2048 -nodes -keyout "$d/localhost.key" -out "$d/localhost.csr" -subj '/CN=localhost'
+printf 'subjectAltName=DNS:localhost\nextendedKeyUsage=serverAuth\n' > "$d/localhost.ext"
+openssl x509 -req -in "$d/localhost.csr" -CA "$d/ca.pem" -CAkey "$d/ca.key" -CAcreateserial -out "$d/localhost.pem" -days 3650 -extfile "$d/localhost.ext"
+cp "$d/ca.pem" android/app/src/debug/res/raw/relaybox_voice_test_ca.pem
+# Rebuild with the documented command; use localhost.pem/key in your local TLS catcher.
+```
+
+UI-driver rule: dismiss the IME with `adb shell input keyevent 111` before searches, scrolling or taps
+outside a field. Swipe inside the actual scroll node, search upward as well as downward, and match
+labels case-insensitively. Choose actionable nodes rather than adjacent text labels. For replacement,
+use the real `input keycombination 113 29` (Ctrl+A), not sequential Ctrl/A keyevents; wait for focus,
+enter text slowly and read it back exactly before submission. Never retain personal prompt text,
+mailbox addresses or credentials in proof; synthetic example-domain values only.
 
 ## Next (not implemented)
 
-Talk-to-agent with editable transcripts and explicit send; separately authorized email ingestion;
+Separately authorized email ingestion;
 OAuth; iOS-appropriate workflows; release signing, dependency/toolchain refresh and CI; broader
 provider support. No backend will be deployed without separate approval.
 

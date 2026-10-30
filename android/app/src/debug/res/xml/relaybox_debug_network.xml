@@ -4,6 +4,6 @@
   <!-- Debug-only, exact loopback hostname. No public host gets this trust anchor. -->
   <domain-config cleartextTrafficPermitted="false">
     <domain includeSubdomains="false">localhost</domain>
-    <trust-anchors><certificates src="@raw/relaybox_test_ca" /><certificates src="system" /></trust-anchors>
+    <trust-anchors><certificates src="@raw/relaybox_test_ca" /><certificates src="@raw/relaybox_voice_test_ca" /><certificates src="system" /></trust-anchors>
   </domain-config>
 </network-security-config>

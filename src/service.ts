@@ -1,12 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {NativeModules, Platform} from 'react-native';
-import {Queue, emptySettings, permissionFailure, validate, reassemble} from './core.ts';
+import {Queue, emptySettings, permissionFailure, validate, validateAgent, reassemble} from './core.ts';
 import type {Settings, Sms, Transport, Vault} from './core.ts';
 
 export const native = NativeModules.Relay as {
   seal(text: string): Promise<string>; open(text: string): Promise<string>;
   hasPassword(): Promise<boolean>; setPassword(text: string): Promise<void>;
   pending(): Promise<string>; ack(ids: string[]): Promise<void>;
+  newId(): Promise<string>; voicePending(value: boolean): Promise<void>;
   enabled(value: boolean): Promise<void>; wake(): Promise<void>; permission(): Promise<boolean>;
   issue(): Promise<string | null>; erase(): Promise<void>; complete(token: string, retry: boolean): void;
   send(settings: Settings, mail: {id: string; subject: string; body: string}): Promise<void>;
@@ -19,7 +20,26 @@ let tail: Promise<unknown> = Promise.resolve();
 function serial<T>(work: () => Promise<T>): Promise<T> {
   const next = tail.then(work); tail = next.catch(() => {}); return next;
 }
-export const settings = async (): Promise<Settings> => JSON.parse(await AsyncStorage.getItem('settings') || JSON.stringify(emptySettings));
+export const settings = async (): Promise<Settings> => ({...emptySettings, ...JSON.parse(await AsyncStorage.getItem('settings') || '{}')});
+export const saveAgent = (value: Settings) => serial(async () => {
+  const error = validateAgent(value); if (error) {throw new Error(error);}
+  if (!(await native.hasPassword())) {throw new Error('Save an app password first.');}
+  await AsyncStorage.setItem('settings', JSON.stringify(value));
+});
+export const sendPrompt = (body: string) => serial(async () => {
+  const s = await settings(); const error = validateAgent(s); if (error) {throw new Error(error);}
+  const m: Sms = {id: await native.newId(), sender: 'Talk to your agent', timestamp: Date.now(), parts: 1, body,
+    voice: {destination: s.agentDestination!, subject: s.agentSubject!}};
+  // Arm durable recovery before journalling; a crash cannot strand an accepted human send.
+  await native.voicePending(true);
+  await queue.ingest(s, m);
+  await queue.flush(s, async () => true, m.id);
+  await updateVoiceRecovery();
+  return (await queue.list()).find(x => x.id === m.id)!;
+});
+async function updateVoiceRecovery() {
+  await native.voicePending((await queue.list()).some(x => x.voice && x.payload && x.status !== 'failed'));
+}
 export const save = (value: Settings) => serial(async () => {
   const error = validate(value); if (error) {throw new Error(error);}
   if (!(await native.hasPassword())) {throw new Error('Save an app password before enabling.');}
@@ -35,15 +55,16 @@ export const toggle = () => serial(async () => {
 export const remove = () => serial(async () => {
   await native.enabled(false); await AsyncStorage.multiRemove(['settings', 'queue']); await native.erase();
 });
-export const retry = () => serial(async () => {await queue.retry(); await native.wake();});
+export const retry = () => serial(async () => {await queue.retry(); await updateVoiceRecovery(); await native.wake();});
 export const status = () => serial(async () => ({deliveries: await queue.list(),
   issue: permissionFailure(await native.permission()) || await native.issue()}));
 export const flush = () => serial(async () => {
   const s = await settings();
-  if (!s.enabled) {return false;}
   const incoming: Parameters<typeof reassemble>[0][] = JSON.parse(await native.pending());
-  for (const event of incoming) {const m = reassemble(event); await queue.ingest(s, m); await native.ack([m.id]);}
-  return queue.flush(s, async () => (await settings()).enabled);
+  if (s.enabled) {for (const event of incoming) {const m = reassemble(event); await queue.ingest(s, m); await native.ack([m.id]);}}
+  const pending = await queue.flush(s, async entry => !!entry.voice || (await settings()).enabled);
+  await updateVoiceRecovery();
+  return pending;
 });
 export const syntheticTest = (s: Settings) => serial(async () => {
   const error = validate(s); if (error) {throw new Error(error);}
