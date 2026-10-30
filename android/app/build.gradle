@@ -57,11 +57,6 @@ react {
 }
 
 /**
- * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
- */
-def enableProguardInReleaseBuilds = false
-
-/**
  * The preferred build flavor of JavaScriptCore (JSC)
  *
  * For example, to use the international variant, you can use:
@@ -88,6 +83,16 @@ android {
         versionCode 1
         versionName "1.0"
     }
+    splits {
+        abi {
+            enable true
+            reset()
+            include(*project.property("reactNativeArchitectures").split(","))
+            universalApk false
+        }
+    }
+    // Keep local verified-STARTTLS testing available in the sideload build.
+    sourceSets { sideload { manifest.srcFile "src/debug/AndroidManifest.xml"; res.srcDir "src/debug/res" } }
     signingConfigs {
         debug {
             storeFile file('debug.keystore')
@@ -104,8 +109,17 @@ android {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
             signingConfig signingConfigs.debug
-            minifyEnabled enableProguardInReleaseBuilds
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+        }
+        sideload {
+            initWith release
+            shrinkResources true
+            // Release native libraries keep the APK small; DEBUG gates only the local test transport.
+            matchingFallbacks = ["release"]
+            debuggable true
+            signingConfig signingConfigs.debug
         }
     }
 }
