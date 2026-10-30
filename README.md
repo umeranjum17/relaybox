@@ -122,9 +122,49 @@ iOS; no SMS-native implementation or parity claim is made.
 `npm test` is one small Node test runner: real sender/filter/multipart/permission logic, encrypted
 file-backed journal reconstruction, deduplication, pause, retry/backoff/exhaustion and acceptance by a
 small local SMTP socket server. This host journey does **not** substitute for Android TLS proof.
-`npx tsc --noEmit` checks application and test sources. Device-specific proof and the downloadable
-APK's path, size and SHA-256 are delivered with the review report. No production mailbox is used
-for acceptance; every address and SMS in captures is synthetic.
+`npx tsc --noEmit` checks application and test sources. No production mailbox was used for
+acceptance; every configured address and injected SMS was synthetic.
+
+### This APK's proof matrix — 30 October 2026
+
+The retained APK was built from implementation commit `880217f4c650699a90a2b893a588cdea10ffb0ad`.
+The subsequent README update changes documentation only, not application/build sources.
+
+| Check | Physical phone | Task-owned emulator | Host runner |
+| --- | --- | --- | --- |
+| Install and launch the same APK | Passed; installed hash verified | Passed; installed hash verified | — |
+| Permission prompt, denial, then allow | Captured in earlier final-APK session | Permission granted for journey | Permission failure logic passed |
+| Five-step setup, review, explicit all-message choice | **Incomplete**; final driver stopped at sender entry | Passed through real UI | Validation/filter defaults passed |
+| Synthetic test through real verified STARTTLS | **Not completed** | Passed against loopback catcher | Separate plain local-socket queue journey passed |
+| Incoming SMS → correct destination, sender/time/body MIME | Not tested | Passed with activity backgrounded | Mail formatting passed |
+| Unrelated sender / content filter | Not tested | Both excluded without email | Passed |
+| Duplicate / multipart | Not tested | Same-second identical injections produced one email; three-part SMS produced one complete email | Queue dedupe and reassembly passed |
+| Retry / reboot persistence | Not tested | Visible 451 failure; recovered after reboot without reopening activity | Backoff, reconstruction and exhaustion passed |
+| Pause / resume / edit / delete / re-onboard | Not tested | Passed | Queue pause/retry passed |
+
+The final physical-phone attempt used its existing large text/density unchanged. The driver
+stopped on an immediate IME-visibility assertion after typing the neutral sender; a later dump
+showed the keyboard hidden. This is a harness limitation, not established as an app defect.
+No phone test email was sent and no rule was enabled. Full physical-phone onboarding/TLS delivery
+remains a follow-up; emulator proof is not relabelled as phone proof. No real provider, implicit
+TLS/465, prolonged battery restrictions, iOS or speech/ingestion workflow was tested.
+
+Handoff artifact: `evidence/relaybox-debug.apk`, **118,421,873 bytes**; SHA-256:
+
+```text
+8877ae6e4f12f5cf13fcf0c28e84a0e409a506d91635002b7df0f9e30a616a19
+```
+
+Evidence is retained outside this repository under the task handoff directory
+`data/new-app-phone-automations-v1-apk-sms-to-0b/evidence/`: `final-report.md`,
+`clean-clone.log`, `clean-build.log`, `clean-final-build.log`, `final-npm-test.log`,
+`final-typecheck.log`, `installed-final-hashes.txt`, `native-final-checks.jsonl`,
+final-step screenshots and synthetic MIME `mail-3.eml` through `mail-8.eml`.
+`mail-1.eml` and `mail-2.eml` predate the final header fix and are **not** final-APK proof.
+The clone's initial build executed all 78 tasks; its final-header rebuild succeeded with four
+executed and 74 up-to-date. Fresh host checks: four tests passed, none skipped; typecheck exit 0.
+Screenshots were visually reviewed; an early transient SMS notification overlay was replaced
+for retry-status proof by the settled `emulator-5586-final-13-retrying-settled.png` capture.
 
 For local Android testing, bind a tiny STARTTLS catcher to host `127.0.0.1:2525` and use:
 
