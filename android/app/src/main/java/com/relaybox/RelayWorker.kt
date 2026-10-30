@@ -22,7 +22,8 @@ class RelayWorker(c: Context, p: WorkerParameters) : Worker(c, p) {
     fun finish(token: String, retry: Boolean) { running[token]?.let { it.retry = retry; it.latch.countDown() } }
   }
   override fun doWork(): Result {
-    if (!RelayDisk.prefs(applicationContext).getBoolean("enabled", false)) return Result.success()
+    if (!RelayDisk.prefs(applicationContext).getBoolean("enabled", false) &&
+      !RelayDisk.prefs(applicationContext).getBoolean("voicePending", false)) return Result.success()
     val token = UUID.randomUUID().toString()
     val completion = Completion(); running[token] = completion
     val handler = Handler(Looper.getMainLooper())

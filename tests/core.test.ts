@@ -6,7 +6,7 @@ import {join} from 'node:path';
 import {createCipheriv, createDecipheriv, randomBytes} from 'node:crypto';
 import {createServer, connect} from 'node:net';
 import {once} from 'node:events';
-import {Queue, emptySettings, matches, senderKey, reassemble, retryDelay, permissionFailure, validate} from '../src/core.ts';
+import {Queue, emptySettings, matches, senderKey, reassemble, retryDelay, permissionFailure, validate, validateAgent, mailFor} from '../src/core.ts';
 import type {Settings, Sms, Transport} from '../src/core.ts';
 
 const s: Settings = {...emptySettings, senders: ['SAMPLE-BANK', '+15550100'], destination: 'you@example.com',
@@ -89,5 +89,27 @@ test('durable journal → local SMTP acceptance; restart, duplicate, retry/backo
     for (let i = 1; i <= 5; i++) {await q.flush(s); now += retryDelay(i);}
     assert.equal((await q.list())[1].status, 'failed');
     await q.retry(); assert.equal((await q.list())[1].attempts, 0);
+    // The second template uses this same encrypted journal and transport, without enabling SMS.
+    const voice: Sms = {...m, id: 'voice-unique-id', sender: 'Talk to your agent', body: 'Synthetic edited planning prompt.',
+      voice: {destination: 'agent@example.com', subject: 'Synthetic agent request'}};
+    const paused = {...s, enabled: false};
+    assert.equal(validateAgent({...paused, agentDestination: voice.voice!.destination, agentSubject: voice.voice!.subject}), undefined);
+    assert(validateAgent({...paused, agentDestination: 'agent@example.com', agentSubject: 'bad\r\nBcc: other@example.com'}));
+    await assert.rejects(() => q.ingest(paused, {...voice, body: ' '}));
+    assert(await q.ingest(paused, voice)); assert(!await q.ingest(paused, voice));
+    assert(!(await store.get('queue'))!.includes(voice.body));
+    const before = captured.length; await q.flush(paused); // catcher still fails
+    assert.equal((await q.list())[2].status, 'retrying'); assert.equal(captured.length, before);
+    q = new Queue(store, vault, transport, () => now); now += 30_000; accept = true;
+    await q.flush({...paused, agentDestination: 'changed@example.com', agentSubject: 'Changed'});
+    assert.equal((await q.list())[1].status, 'retrying'); // paused SMS did not block voice behind it
+    assert.equal((await q.list())[2].status, 'sent');
+    const email = captured.slice(before).join('\n');
+    assert(email.includes('To: agent@example.com')); assert(email.includes('Subject: Synthetic agent request'));
+    assert(email.includes(`Message ID: ${voice.id}`)); assert(email.includes(new Date(voice.timestamp).toISOString()));
+    assert(email.includes(voice.body)); assert(!email.includes('changed@example.com'));
+    assert.equal(mailFor(voice).id, voice.id);
+    assert((await q.journal()).filter(x => x.id === voice.id).every(x => !x.payload));
+    const after = captured.length; await q.flush(paused); assert.equal(captured.length, after);
   } finally {server.close(); await rm(dir, {recursive: true, force: true});}
 });
